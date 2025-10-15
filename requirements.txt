@@ -1,0 +1,8 @@
+charm-crypto
+cryptography
+pydantic
+click
+pytest
+hypothesis
+pytest-benchmark
+msgpack
