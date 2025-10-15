@@ -18,6 +18,8 @@ class MemStore:
         self._acc_value: Optional[bytes] = None
         self._acc_cache: List[bytes] = []
         self._acc_poly_coeffs: List[bytes] = []  # ascending coeffs over ZR, serialized
+        self._acc_version: str | None = None
+        self._acc_curve: str | None = None
 
     # --- Common root management ---
     def set_root(self, scheme: str, root: RootDigest) -> None:
@@ -69,3 +71,7 @@ class MemStore:
 
     def acc_count(self) -> int:
         return len(self._acc_items)
+
+    # Powers append (for performance API)
+    def append_powers(self, new: List[bytes]) -> None:
+        self._acc_cache.extend(new)

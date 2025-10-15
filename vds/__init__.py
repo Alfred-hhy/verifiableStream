@@ -12,6 +12,8 @@ environment support for charm-crypto.
 
 from .common import errors, types
 
+__version__ = "0.1.0"
+
 __all__ = [
     "errors",
     "types",

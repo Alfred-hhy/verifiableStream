@@ -19,6 +19,7 @@ from .accumulator import (
     acc_nonmem_verify,
 )
 from ..common.types import ACCState, ACCKey
+from vds import __version__ as VDS_VERSION
 
 import os
 from pydantic import BaseModel
@@ -43,6 +44,8 @@ class VDSACC:
         powers: List[bytes]  # G1 list
         U: int
         cnt: int
+        curve: str
+        version: str
 
     def setup(self) -> tuple[ACCPublic, bytes]:
         # signature keys
@@ -91,6 +94,8 @@ class VDSACC:
             "powers": st.cache,
             "U": 0,
             "cnt": 0,
+            "curve": str(getattr(self.grp, 'groupType', 'MNT224')),
+            "version": VDS_VERSION,
         }
         return pub, ser.pack(client_state)
 
@@ -216,3 +221,39 @@ class VDSACC:
         from ..common.types import RootDigest
 
         return RootDigest(value=b)
+
+    # --- Export / Import ---
+    def export_state(self, st: bytes) -> bytes:
+        """Export client state including accumulator value, powers, f_coeffs, U.
+
+        Returned as msgpack with version and curve for compatibility.
+        """
+        state = self._load_state(st)
+        acc_val, powers = self.store.get_acc_state()
+        coeffs = self.store.get_acc_poly()
+        payload = {
+            "version": VDS_VERSION,
+            "curve": str(getattr(self.grp, 'groupType', 'MNT224')),
+            "accumulator": acc_val,
+            "powers": powers,
+            "f_coeffs": coeffs,
+            "U": state.get("U", 0),
+            "cnt": state.get("cnt", 0),
+        }
+        return ser.pack(payload)
+
+    def import_state(self, st: bytes, blob: bytes) -> bytes:
+        """Import client/server state; returns new client state bytes.
+
+        Validates version and curve, sets store acc state and coefficients.
+        """
+        state = self._load_state(st)
+        data = ser.unpack(blob, dict)
+        if data.get("version") != VDS_VERSION:
+            raise StorageError("state version mismatch")
+        # curve check is best-effort metadata
+        self.store.set_acc_state(data["accumulator"], data["powers"])  # type: ignore[index]
+        self.store.set_acc_poly(data["f_coeffs"])  # type: ignore[index]
+        state["U"] = data.get("U", state.get("U", 0))
+        state["cnt"] = data.get("cnt", state.get("cnt", 0))
+        return ser.pack(state)

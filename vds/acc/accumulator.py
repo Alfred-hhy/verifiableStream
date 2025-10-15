@@ -16,6 +16,7 @@ from typing import Any, List, Tuple
 from charm.toolbox.pairinggroup import G1, G2, ZR, pair
 
 from ..common.types import ACCKey, ACCState
+from ..common.errors import StorageError
 
 
 def _serialize(grp: Any, elem: Any) -> bytes:
@@ -93,6 +94,36 @@ def acc_nonmem_verify(grp: Any, g1_bytes: bytes, h_bytes: bytes, hs_bytes: bytes
         return lhs == rhs
     except Exception:
         return False
+
+
+# --- Product tree placeholder (for performance optimization) ---
+class PolyTree:
+    """A simple product tree for f(X)=∏(X+x_i).
+
+    This placeholder stores coefficients at the root and leaves for compatibility.
+    Future optimization: compute f(-y) and Q(X) in O(U log U) with less overhead.
+    """
+
+    def __init__(self, grp: Any):
+        self.grp = grp
+        self.xs: List[Any] = []  # elements in ZR
+        self.coeffs: List[Any] = [grp.init(ZR, 1)]  # ascending coeffs of f(X)
+
+    def add(self, x: Any) -> None:
+        from .accumulator import poly_mul
+
+        X_plus_x = [x, self.grp.init(ZR, 1)]
+        self.coeffs = poly_mul(self.grp, self.coeffs, X_plus_x)
+        self.xs.append(x)
+
+    def eval_and_quot(self, y: Any) -> tuple[Any, List[Any]]:
+        v = poly_eval(self.grp, self.coeffs, -y)
+        g_coeffs = self.coeffs.copy()
+        g_coeffs[0] = g_coeffs[0] - v
+        Q, rem = poly_div_linear(self.grp, g_coeffs, y)
+        if str(rem) != str(self.grp.init(ZR, 0)):
+            raise StorageError("poly division remainder non-zero")
+        return v, Q
 
 
 # Polynomial helpers over ZR
