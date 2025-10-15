@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Any
+import hashlib
+from charm.toolbox.pairinggroup import ZR, G1
 from .errors import GroupError
 
 
@@ -39,12 +41,15 @@ def get_group(curve: str = "MNT224") -> Any:
 
 
 def hash_to_Zp(grp: Any, data: bytes) -> Any:
-    try:
-        from charm.toolbox.pairinggroup import ZR
+    """Canonical map bytes -> ZR via SHA-256 then mod p.
 
-        return grp.hash(data, ZR)
+    Using grp.init(ZR, int) ensures reduction modulo group order.
+    """
+    try:
+        n = int.from_bytes(hashlib.sha256(data).digest(), "big")
+        return grp.init(ZR, n)
     except Exception as e:  # pragma: no cover
-        raise GroupError("hash_to_Zp requires charm PairingGroup") from e
+        raise GroupError("hash_to_Zp failed") from e
 
 
 def serialize_elem(grp: Any, elem: Any) -> bytes:
@@ -69,3 +74,12 @@ def pair(grp: Any, a: Any, b: Any) -> Any:
     except Exception as e:  # pragma: no cover
         raise GroupError("pairing failed or charm not present") from e
 
+
+def serialize_G1(grp: Any, elem: Any) -> bytes:
+    """Canonical serializer for G1 elements (used for pointer hashing)."""
+    return serialize_elem(grp, elem)
+
+
+def H_zr(grp: Any, b: bytes) -> Any:
+    """Alias of hash_to_Zp for clarity in CVC code."""
+    return hash_to_Zp(grp, b)
