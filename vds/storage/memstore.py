@@ -17,6 +17,7 @@ class MemStore:
         self._acc_items: Dict[int, Tuple[bytes, bytes, int, bytes]] = {}
         self._acc_value: Optional[bytes] = None
         self._acc_cache: List[bytes] = []
+        self._acc_poly_coeffs: List[bytes] = []  # ascending coeffs over ZR, serialized
 
     # --- Common root management ---
     def set_root(self, scheme: str, root: RootDigest) -> None:
@@ -59,3 +60,12 @@ class MemStore:
             raise StorageError("ACC state not set")
         return self._acc_value, list(self._acc_cache)
 
+    # Polynomial coefficients for f(X) = prod (X + x_i), ascending, elements in ZR serialized
+    def set_acc_poly(self, coeffs: List[bytes]) -> None:
+        self._acc_poly_coeffs = list(coeffs)
+
+    def get_acc_poly(self) -> List[bytes]:
+        return list(self._acc_poly_coeffs)
+
+    def acc_count(self) -> int:
+        return len(self._acc_items)
